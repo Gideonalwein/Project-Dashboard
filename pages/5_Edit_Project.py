@@ -32,6 +32,12 @@ project_selection = st.selectbox("📌 Select Project", ["-- Select a project --
 if project_selection and project_selection != "-- Select a project --":
     data = project_df[project_df["project_name"] == project_selection].iloc[0]
 
+    try:
+        project_id = int(data["id"])  # Ensure ID is int and usable in SQL
+    except Exception as e:
+        st.error(f"❌ Error resolving project ID: {e}")
+        st.stop()
+
     with st.form("edit_project_form"):
         # Resolve Resource index
         default_resource_id = int(data["resource_id"]) if pd.notnull(data["resource_id"]) else team_df.iloc[0]["id"]
@@ -65,7 +71,8 @@ if project_selection and project_selection != "-- Select a project --":
     # --- Update Logic ---
     if submitted:
         new_resource_id = int(team_df[team_df["name"] == resource]["id"].values[0])
-        conn.execute("""
+
+        cursor = conn.execute("""
             UPDATE projects SET
                 project_name = ?, resource_id = ?, client_country = ?, service_line = ?,
                 resource_available_in_kenya = ?, activity = ?, partners_needed = ?,
@@ -75,11 +82,12 @@ if project_selection and project_selection != "-- Select a project --":
             project_name, new_resource_id, client_country, service_line,
             available, activity, partners_needed,
             start_date.isoformat(), end_date.isoformat(), hours,
-            priority, status, impact, comments, data["id"]
+            priority, status, impact, comments, project_id
         ))
         conn.commit()
+        st.success(f"✅ Project updated. Rows affected: {cursor.rowcount}")
 
-        # Recalculate assigned_hours for team_members
+        # Recalculate team member hours
         conn.execute("""
             UPDATE team_members
             SET assigned_hours = (
@@ -89,8 +97,6 @@ if project_selection and project_selection != "-- Select a project --":
             )
         """)
         conn.commit()
-
-        st.success("✅ Project updated successfully and team member hours recalculated.")
         st.rerun()
 
     # --- Delete Section ---
@@ -103,9 +109,9 @@ if project_selection and project_selection != "-- Select a project --":
         with col2:
             if st.button("❌ Delete Project"):
                 if confirm_delete:
-                    conn.execute("DELETE FROM projects WHERE id = ?", (data["id"],))
+                    cursor = conn.execute("DELETE FROM projects WHERE id = ?", (project_id,))
                     conn.commit()
-                    st.success(f"🗑️ Project '{project_selection}' deleted.")
+                    st.success(f"🗑️ Project deleted. Rows affected: {cursor.rowcount}")
                     st.rerun()
                 else:
                     st.warning("☝️ Please confirm deletion.")

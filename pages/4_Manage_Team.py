@@ -11,7 +11,9 @@ cursor = conn.cursor()
 # Get unique activities for role dropdown
 activities = [row[0] for row in cursor.execute("SELECT DISTINCT activity FROM projects WHERE activity IS NOT NULL").fetchall()]
 
-# Add New Member
+# -------------------------------
+# ➕ Add New Member
+# -------------------------------
 st.subheader("➕ Add New Team Member")
 with st.form("add_member"):
     name = st.text_input("Name")
@@ -28,7 +30,9 @@ with st.form("add_member"):
             conn.commit()
             st.success(f"{name} added successfully.")
 
-# View & Edit Members
+# -------------------------------
+# 📝 Team Members List
+# -------------------------------
 st.subheader("📝 Team Members List")
 df = pd.read_sql_query("""
     SELECT tm.id, tm.name, tm.email, tm.role,
@@ -38,8 +42,26 @@ df = pd.read_sql_query("""
     GROUP BY tm.id, tm.name, tm.email, tm.role
 """, conn)
 
-edited_df = st.data_editor(df, use_container_width=True, disabled=["id", "assigned_hours"], key="edit")
+# Total row at bottom
+total_hours = df["assigned_hours"].sum()
+total_row = pd.DataFrame({
+    "id": [""],
+    "name": ["**Total**"],
+    "email": [""],
+    "role": [""],
+    "assigned_hours": [total_hours]
+})
+df_with_total = pd.concat([df, total_row], ignore_index=True)
 
+# Editable table (exclude total row)
+edited_df = st.data_editor(df_with_total.iloc[:-1], use_container_width=True, disabled=["id", "assigned_hours"], key="edit")
+
+# Show total separately
+st.markdown(f"**🔢 Total Assigned Hours: `{int(total_hours)}`**")
+
+# -------------------------------
+# 💾 Save Changes
+# -------------------------------
 if st.button("💾 Save Changes"):
     for i, row in edited_df.iterrows():
         cursor.execute("UPDATE team_members SET name=?, email=?, role=? WHERE id=?",
@@ -47,7 +69,9 @@ if st.button("💾 Save Changes"):
     conn.commit()
     st.success("Team member(s) updated.")
 
-# Delete member
+# -------------------------------
+# 🗑️ Delete Member
+# -------------------------------
 st.subheader("🗑️ Delete Team Member")
 member_ids = df["id"].tolist()
 member_names = df["name"].tolist()
