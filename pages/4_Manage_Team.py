@@ -22,13 +22,18 @@ with st.form("add_member"):
 
     if st.form_submit_button("Add Member"):
         if not re.match(r"[^@]+@[^@]+\.[^@]+", email):
-            st.error("Please enter a valid email address.")
+            st.error("❌ Please enter a valid email address.")
         elif not name:
-            st.error("Name is required.")
+            st.error("❌ Name is required.")
         else:
-            cursor.execute("INSERT INTO team_members (name, email, role) VALUES (?, ?, ?)", (name, email, role))
-            conn.commit()
-            st.success(f"{name} added successfully.")
+            # Check if email already exists
+            existing = cursor.execute("SELECT id FROM team_members WHERE email = ?", (email,)).fetchone()
+            if existing:
+                st.error("⚠️ A team member with this email already exists.")
+            else:
+                cursor.execute("INSERT INTO team_members (name, email, role) VALUES (?, ?, ?)", (name, email, role))
+                conn.commit()
+                st.success(f"✅ {name} added successfully.")
 
 # -------------------------------
 # 📝 Team Members List
@@ -67,7 +72,7 @@ if st.button("💾 Save Changes"):
         cursor.execute("UPDATE team_members SET name=?, email=?, role=? WHERE id=?",
                        (row["name"], row["email"], row["role"], row["id"]))
     conn.commit()
-    st.success("Team member(s) updated.")
+    st.success("✅ Team member(s) updated.")
 
 # -------------------------------
 # 🗑️ Delete Member
@@ -82,4 +87,4 @@ if st.button("Delete Member"):
     cursor.execute("UPDATE projects SET resource_id=NULL WHERE resource_id=?", (member_map[selected],))
     cursor.execute("DELETE FROM team_members WHERE id=?", (member_map[selected],))
     conn.commit()
-    st.success(f"{selected} deleted.")
+    st.success(f"🗑️ {selected} deleted.")
